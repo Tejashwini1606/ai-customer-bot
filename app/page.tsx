@@ -14,10 +14,18 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  // Function to handle Human Escalation (Email)
+  const handleEscalate = () => {
+    const subject = encodeURIComponent("Complaint/Support Request - SmartStore");
+    const body = encodeURIComponent("Hello, I need help with my order. My issue is: ");
+    window.location.href = `mailto:support@smartstore.com?subject=${subject}&body=${body}`;
+  };
 
-    const userMsg = { role: "user", content: input };
+  const handleSend = async (textOverride?: string) => {
+    const messageToSend = textOverride || input;
+    if (!messageToSend.trim()) return;
+
+    const userMsg = { role: "user", content: messageToSend };
     const newMessages = [...messages, userMsg];
     
     setMessages(newMessages);
@@ -41,7 +49,7 @@ export default function ChatPage() {
     } catch (error) {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Sorry, I'm having trouble connecting." },
+        { role: "assistant", content: "Sorry, I'm having trouble connecting to the server." },
       ]);
     } finally {
       setIsLoading(false);
@@ -49,12 +57,10 @@ export default function ChatPage() {
   };
 
   return (
-    // h-[100dvh] is "Dynamic Viewport Height" - it auto-adjusts when mobile bars appear/disappear
     <div className="flex flex-col items-center justify-center h-[100dvh] bg-slate-50 p-2 md:p-4 overflow-hidden">
       
       <Card className="w-full max-w-2xl h-full md:h-[750px] flex flex-col shadow-2xl border-none overflow-hidden">        
         
-        {/* Header: Made padding smaller on mobile (p-4 vs md:p-6) */}
         <CardHeader className="border-b bg-white p-4 md:p-6 flex flex-row items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
             <div className="bg-blue-600 p-2 rounded-lg">
@@ -65,15 +71,35 @@ export default function ChatPage() {
               <p className="text-[10px] md:text-xs text-green-500 font-medium">● Online | 24/7 Support</p>
             </div>
           </div>
-          <Button variant="outline" size="sm" className="h-8 gap-1 text-xs md:text-sm text-red-500 border-red-200">
+          <Button 
+            onClick={handleEscalate}
+            variant="outline" 
+            size="sm" 
+            className="h-8 gap-1 text-xs md:text-sm text-red-500 border-red-200 hover:bg-red-50"
+          >
             <LifeBuoy className="w-3 h-3 md:w-4 md:h-4" />
-            <span className="hidden xs:inline">Talk to Human</span>
-            <span className="xs:hidden">Help</span>
+            <span className="hidden sm:inline">Talk to Human</span>
+            <span className="sm:hidden">Help</span>
           </Button>
         </CardHeader>
 
-        {/* Content: p-4 for mobile to give more chat space */}
         <CardContent className="flex-1 overflow-hidden p-4 md:p-6 flex flex-col bg-white">
+          
+          {/* Quick Suggestions - Only shown at the start */}
+          {messages.length === 1 && (
+            <div className="flex flex-wrap gap-2 mb-4 shrink-0">
+              {["Shipping info", "Return policy", "Order status"].map((text) => (
+                <button
+                  key={text}
+                  onClick={() => handleSend(text)}
+                  className="text-[10px] md:text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full border border-blue-100 hover:bg-blue-100 transition-colors"
+                >
+                  {text}
+                </button>
+              ))}
+            </div>
+          )}
+
           <ScrollArea className="flex-1 pr-2">
             {messages.map((msg, index) => (
               <div
@@ -102,7 +128,6 @@ export default function ChatPage() {
             )}
           </ScrollArea>
           
-          {/* Input Area: Fixed at bottom with mt-auto */}
           <div className="flex gap-2 mt-2 pt-3 border-t shrink-0">
             <Input
               placeholder="Ask a question..."
@@ -111,7 +136,7 @@ export default function ChatPage() {
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               className="flex-1 h-11 md:h-12 bg-slate-50 border-slate-200 text-sm md:text-base"
             />
-            <Button onClick={handleSend} className="h-11 w-11 md:h-12 md:w-12 rounded-full bg-blue-600 shrink-0">
+            <Button onClick={() => handleSend()} className="h-11 w-11 md:h-12 md:w-12 rounded-full bg-blue-600 shrink-0">
               <Send className="w-5 h-5" />
             </Button>
           </div>
