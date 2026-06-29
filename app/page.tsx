@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,11 +13,22 @@ export default function ChatPage() {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Ref for auto-scrolling to the bottom
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll effect whenever messages change
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  }, [messages, isLoading]);
 
   const handleEscalate = () => {
-    const subject = encodeURIComponent("Complaint/Support Request - SmartStore");
-    const body = encodeURIComponent("Hello, I need help with my order. My issue is: ");
-    window.location.href = `mailto:support@smartstore.com?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:support@smartstore.com?subject=Support Request`;
   };
 
   const handleSend = async (textOverride?: string) => {
@@ -35,120 +46,104 @@ export default function ChatPage() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages.slice(-5) }),
+        body: JSON.stringify({ messages: newMessages.slice(-10) }),
       });
 
       const data = await response.json();
-      if (data.error) throw new Error(data.error);
-
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: data.content },
-      ]);
+      setMessages((prev) => [...prev, { role: "assistant", content: data.content }]);
     } catch (error) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Sorry, I'm having trouble connecting to the server." },
-      ]);
+      setMessages((prev) => [...prev, { role: "assistant", content: "Connection error." }]);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    // We use h-screen and overflow-hidden here to lock the page in place
-    <div className="flex flex-col items-center justify-center h-screen w-full bg-slate-50 p-2 md:p-4 overflow-hidden">
+    // FULL SCREEN WRAPPER - Prevents the whole page from scrolling
+    <div className="fixed inset-0 flex items-center justify-center bg-slate-50 p-0 md:p-4 overflow-hidden">
       
-      {/* max-h-[90dvh] ensures the card never gets taller than the screen */}
-      <Card className="w-full max-w-2xl h-full max-h-[95dvh] md:max-h-[800px] flex flex-col shadow-2xl border-none overflow-hidden">        
+      {/* THE CHAT CARD - Set to fill height/width correctly */}
+      <Card className="w-full max-w-2xl h-full md:h-[90vh] flex flex-col shadow-2xl border-none md:rounded-2xl overflow-hidden bg-white">        
         
-        <CardHeader className="border-b bg-white p-4 flex flex-row items-center justify-between shrink-0">
+        {/* HEADER - Fixed at top */}
+        <CardHeader className="flex-none border-b p-4 flex flex-row items-center justify-between bg-white z-10">
           <div className="flex items-center gap-2">
             <div className="bg-blue-600 p-2 rounded-lg">
-              <Bot className="w-5 h-5 md:w-6 md:h-6 text-white" />
+              <Bot className="w-5 h-5 text-white" />
             </div>
             <div>
-              <CardTitle className="text-base md:text-lg font-bold tracking-tight">Customer Care AI</CardTitle>
-              <p className="text-[10px] md:text-xs text-green-500 font-medium">● Online | 24/7 Support</p>
+              <CardTitle className="text-base font-bold">Customer Care AI</CardTitle>
+              <p className="text-[10px] text-green-500 font-medium">● Online</p>
             </div>
           </div>
-          <Button 
-            onClick={handleEscalate}
-            variant="outline" 
-            size="sm" 
-            className="h-8 gap-1 text-xs text-red-500 border-red-200 hover:bg-red-50"
-          >
-            <LifeBuoy className="w-3 h-3 md:w-4 md:h-4" />
-            <span className="hidden xs:inline">Talk to Human</span>
-            <span className="xs:hidden">Help</span>
+          <Button onClick={handleEscalate} variant="outline" size="sm" className="text-red-500 text-xs h-8">
+            <LifeBuoy className="w-4 h-4 mr-1" /> Help
           </Button>
         </CardHeader>
 
-        <CardContent className="flex-1 min-h-0 p-4 md:p-6 flex flex-col bg-white overflow-hidden">
+        {/* MESSAGES AREA - This is the only part that scrolls */}
+        <CardContent className="flex-1 min-h-0 p-0 relative flex flex-col">
           
-          {messages.length === 1 && (
-            <div className="flex flex-wrap gap-2 mb-4 shrink-0">
-              {["Shipping info", "Return policy", "Order status"].map((text) => (
-                <button
-                  key={text}
-                  onClick={() => handleSend(text)}
-                  className="text-[10px] md:text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full border border-blue-100 hover:bg-blue-100 transition-colors"
-                >
-                  {text}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* This ScrollArea is now strictly constrained */}
-          <ScrollArea className="flex-1 w-full rounded-md border-none pr-2">
-            <div className="flex flex-col gap-4 pb-4">
-              {messages.map((msg, index) => (
-                <div
-                  key={index}
-                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[90%] md:max-w-[85%] p-3 md:p-4 rounded-2xl shadow-sm ${
-                      msg.role === "user"
-                        ? "bg-blue-600 text-white rounded-tr-none"
-                        : "bg-slate-100 text-slate-800 rounded-tl-none border border-slate-200"
-                    }`}
+          {/* Custom Scrollable Container */}
+          <div 
+            ref={scrollRef}
+            className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scrollbar-thin"
+          >
+            {messages.length === 1 && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {["Shipping info", "Return policy", "Order status"].map((text) => (
+                  <button
+                    key={text}
+                    onClick={() => handleSend(text)}
+                    className="text-[10px] bg-blue-50 text-blue-600 px-3 py-1 rounded-full border border-blue-100 hover:bg-blue-100"
                   >
-                    <p className="text-sm md:text-base leading-relaxed">{msg.content}</p>
-                  </div>
+                    {text}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {messages.map((msg, index) => (
+              <div key={index} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[85%] p-3 md:p-4 rounded-2xl shadow-sm text-sm md:text-base ${
+                  msg.role === "user" ? "bg-blue-600 text-white rounded-tr-none" : "bg-slate-100 text-slate-800 rounded-tl-none"
+                }`}>
+                  {msg.content}
                 </div>
-              ))}
-              {isLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-slate-100 p-3 rounded-2xl animate-pulse text-slate-400 text-xs">
-                    AI is thinking...
-                  </div>
+              </div>
+            ))}
+            
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="bg-slate-100 p-3 rounded-2xl animate-pulse text-slate-400 text-xs italic">
+                  AI is typing...
                 </div>
-              )}
-            </div>
-          </ScrollArea>
-          
-          {/* Input Area - Forced to stay at bottom with shrink-0 */}
-          <div className="flex gap-2 mt-4 pt-4 border-t shrink-0">
+              </div>
+            )}
+          </div>
+        </CardContent>
+
+        {/* INPUT AREA - Fixed at the very bottom */}
+        <div className="flex-none p-4 border-t bg-white">
+          <div className="flex gap-2 max-w-2xl mx-auto">
             <Input
-              placeholder="Ask a question..."
+              placeholder="Type your message..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              className="flex-1 h-11 md:h-12 bg-slate-50 border-slate-200 text-sm md:text-base focus-visible:ring-blue-600"
+              className="flex-1 h-11 bg-slate-50 border-slate-200 focus:ring-2 focus:ring-blue-600"
             />
             <Button 
               onClick={() => handleSend()} 
               disabled={isLoading}
-              className="h-11 w-11 md:h-12 md:w-12 rounded-full bg-blue-600 hover:bg-blue-700 shrink-0"
+              className="h-11 w-11 rounded-full bg-blue-600 hover:bg-blue-700 shrink-0"
             >
               <Send className="w-5 h-5" />
             </Button>
           </div>
-        </CardContent>
+        </div>
+
       </Card>
-      
     </div>
   );
 }
